@@ -1,0 +1,96 @@
+services:
+  mem0:
+    image: 'mem0-app:latest'
+    pull_policy: build
+    build:
+      context: 'https://github.com/jaketribe417/mem0-hermes-skill.git#main'
+      dockerfile: Dockerfile
+    environment:
+      OPENAI_API_KEY: '${OPENAI_API_KEY}'
+      OLLAMA_CLOUD_API_KEY: '${OLLAMA_CLOUD_API_KEY}'
+      MEM0_DEFAULT_LLM_MODEL: 'gpt-oss:20b-cloud'
+      MEM0_DEFAULT_EMBEDDER_MODEL: text-embedding-3-small
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mem0
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_COLLECTION_NAME: memories
+      JWT_SECRET: '${JWT_SECRET}'
+      ADMIN_API_KEY: '${ADMIN_API_KEY}'
+      AUTH_DISABLED: 'false'
+      DASHBOARD_URL: 'https://mem0.jhostly.com'
+      APP_DB_NAME: mem0
+      MEM0_TELEMETRY: 'false'
+    expose:
+      - '8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - 'mem0-history:/app/history'
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://localhost:8000/__build__']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - mem0-hardened
+
+  postgres:
+    image: 'ankane/pgvector:v0.5.1'
+    restart: on-failure
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_DB: mem0
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - mem0
+        - '-U'
+        - mem0user
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - 'mem0-pgdata-v2:/var/lib/postgresql/data'
+    networks:
+      - mem0-hardened
+
+  mem0-dashboard:
+    image: 'mem0-dashboard:latest'
+    pull_policy: build
+    build:
+      context: 'https://github.com/jaketribe417/mem0-hermes-skill.git#main'
+      dockerfile: dashboard.Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: 'https://mem0api.jhostly.com'
+      API_INTERNAL_URL: 'http://mem0:8000'
+      NEXT_PUBLIC_INSTANCE_NAME: Mem0
+    expose:
+      - '3000'
+    depends_on:
+      - mem0
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://localhost:3000/login']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mem0-hardened
+
+volumes:
+  mem0-history:
+  mem0-pgdata-v2:
+
+networks:
+  mem0-hardened:
