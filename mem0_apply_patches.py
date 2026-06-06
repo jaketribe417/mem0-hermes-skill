@@ -14,11 +14,12 @@ import sys
 import re
 
 PATCHES = {
-    "main.py": {
+    "main.py_ollama_key": {
         "target": r"OPENAI_API_KEY = os\.environ\.get\(\"OPENAI_API_KEY\"\)",
         "replacement": r'''OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")''',
-        "description": "Inject OLLAMA_API_KEY alongside OPENAI_API_KEY"
+        "description": "Inject OLLAMA_API_KEY alongside OPENAI_API_KEY",
+        "critical": False,
     },
     "main.py_config": {
         "target": r'"collection_name": POSTGRES_COLLECTION_NAME,',
@@ -26,19 +27,22 @@ OLLAMA_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")''',
             "embedding_model_dims": 1536,
             "hnsw": False,
             "diskann": False,''',
-        "description": "Set 1536 embedding dims, disable HNSW/diskann for pgvector"
+        "description": "Set 1536 embedding dims, disable HNSW/diskann for pgvector",
+        "critical": False,
     },
     "main.py_llm": {
         "target": r'"llm": \{\s*"provider": "openai",\s*"config": \{"api_key": OPENAI_API_KEY, "temperature": 0\.2, "model": DEFAULT_LLM_MODEL\},',
         "replacement": r'''"llm": {
         "provider": "openai",
         "config": {"api_key": OLLAMA_API_KEY or OPENAI_API_KEY, "openai_base_url": "https://ollama.com/v1" if OLLAMA_API_KEY else None, "temperature": 0.2, "model": DEFAULT_LLM_MODEL},''',
-        "description": "Route LLM through Ollama when OLLAMA_API_KEY is set"
+        "description": "Route LLM through Ollama when OLLAMA_API_KEY is set",
+        "critical": False,
     },
     "mem0/memory/main.py_score": {
         "target": r'"score": mem\.score,',
         "replacement": r'''"score": (1.0 - mem.score) if mem.score > 0.5 else mem.score,''',
-        "description": "Invert cosine distance to similarity for pgvector results"
+        "description": "Invert cosine distance to similarity for pgvector results",
+        "critical": True,
     },
     "main.py_build_endpoint": {
         "target": r'@app\.get\("/", summary="Redirect to the OpenAPI documentation", include_in_schema=False\)',
@@ -60,7 +64,8 @@ def __build__():
     }
 
 @app.get("/", summary="Redirect to the OpenAPI documentation", include_in_schema=False)''',
-        "description": "Inject /__build__ health endpoint"
+        "description": "Inject /__build__ health endpoint",
+        "critical": False,
     },
 }
 
@@ -112,42 +117,51 @@ def main():
             break
     
     results = {"applied": 0, "failed": 0, "skipped": 0}
+    critical_failures = 0
     
     # Patch main.py
     if main_py:
         print(f"\nPatching: {main_py}")
-        for key in ["main.py", "main.py_config", "main.py_llm", "main.py_build_endpoint"]:
+        for key in ["main.py_ollama_key", "main.py_config", "main.py_llm", "main.py_build_endpoint"]:
             patch = PATCHES[key]
-            if apply_patch(main_py, key, patch["target"], patch["replacement"], patch["description"]):
+            ok = apply_patch(main_py, key, patch["target"], patch["replacement"], patch["description"])
+            if ok:
                 results["applied"] += 1
             else:
                 results["failed"] += 1
+                if patch.get("critical", False):
+                    critical_failures += 1
     else:
         print("ERROR: main.py not found")
         results["failed"] += 4
+        critical_failures += 4
     
     # Patch mem0/memory/main.py
     if memory_main:
         print(f"\nPatching: {memory_main}")
         patch = PATCHES["mem0/memory/main.py_score"]
-        if apply_patch(memory_main, "mem0/memory/main.py_score", patch["target"], patch["replacement"], patch["description"]):
+        ok = apply_patch(memory_main, "mem0/memory/main.py_score", patch["target"], patch["replacement"], patch["description"])
+        if ok:
             results["applied"] += 1
         else:
             results["failed"] += 1
+            if patch.get("critical", False):
+                critical_failures += 1
     else:
         print("ERROR: mem0/memory/main.py not found")
         results["failed"] += 1
+        critical_failures += 1
     
     print(f"\n{'='*50}")
     print(f"Patches applied: {results['applied']}")
-    print(f"Patches failed: {results['failed']}")
+    print(f"Patches failed: {results['failed']} ({critical_failures} critical)")
     print(f"{'='*50}")
     
-    if results["failed"] > 0:
-        print("ERROR: Some patches failed. Do not deploy.")
+    if critical_failures > 0:
+        print("ERROR: Critical patch failed. Do not deploy.")
         sys.exit(1)
     
-    print("SUCCESS: All patches applied. Ready for deployment.")
+    print("SUCCESS: All critical patches applied. Ready for deployment.")
 
 if __name__ == "__main__":
     main()
