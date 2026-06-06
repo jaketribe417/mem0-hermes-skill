@@ -13,7 +13,8 @@ RUN curl -sL "https://github.com/mem0ai/mem0/archive/${MEM0_COMMIT}.tar.gz" | ta
     && rm -rf mem0-${MEM0_COMMIT}
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir psycopg-binary
 
 EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
