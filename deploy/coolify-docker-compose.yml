@@ -1,0 +1,214 @@
+services:
+  mem0:
+    image: 'mem0-app:latest'
+    pull_policy: build
+    build:
+      context: 'https://github.com/jaketribe417/mem0-hermes-skill.git#main'
+      dockerfile: deploy/Dockerfile
+    environment:
+      OPENAI_API_KEY: '${OPENAI_API_KEY}'
+      OLLAMA_CLOUD_API_KEY: '${OLLAMA_CLOUD_API_KEY}'
+      MEM0_DEFAULT_LLM_MODEL: 'gpt-oss:20b-cloud'
+      MEM0_DEFAULT_EMBEDDER_MODEL: text-embedding-3-small
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mem0
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_COLLECTION_NAME: memories
+      JWT_SECRET: '${JWT_SECRET}'
+      ADMIN_API_KEY: '${ADMIN_API_KEY}'
+      AUTH_DISABLED: 'false'
+      DASHBOARD_URL: 'https://mem0.jhostly.com'
+      APP_DB_NAME: mem0
+      MEM0_TELEMETRY: 'false'
+      COOLIFY_RESOURCE_UUID: y5yyqqo45yfnx6kviqypa5dh
+      COOLIFY_CONTAINER_NAME: mem0-y5yyqqo45yfnx6kviqypa5dh
+      COOLIFY_FQDN: mem0api.jhostly.com
+      COOLIFY_URL: 'https://mem0api.jhostly.com'
+      SERVICE_NAME_MEM0: mem0
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_MEM0_DASHBOARD: mem0-dashboard
+    expose:
+      - '8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - 'y5yyqqo45yfnx6kviqypa5dh_mem0-history:/app/history'
+    restart: unless-stopped
+    container_name: mem0-y5yyqqo45yfnx6kviqypa5dh
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://localhost:8000/__build__']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.1.0
+      - coolify.serviceId=3
+      - coolify.type=service
+      - coolify.name=mem0-y5yyqqo45yfnx6kviqypa5dh
+      - coolify.resourceName=service-ej07ayd7karag0pdo1cqh77u
+      - coolify.projectName=mem0
+      - coolify.serviceName=mem0
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+      - coolify.service.subId=7
+      - coolify.service.subType=application
+      - coolify.service.subName=mem0
+      - traefik.enable=true
+      - traefik.http.middlewares.gzip.compress=true
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0.entryPoints=http
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0.middlewares=redirect-to-https
+      - 'traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0.rule=Host(`mem0api.jhostly.com`) && PathPrefix(`/`)'
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0.service=http-0-y5yyqqo45yfnx6kviqypa5dh-mem0
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.entryPoints=https
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.middlewares=gzip
+      - 'traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.rule=Host(`mem0api.jhostly.com`) && PathPrefix(`/`)'
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.service=https-0-y5yyqqo45yfnx6kviqypa5dh-mem0
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.tls.certresolver=letsencrypt
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.tls=true
+      - traefik.http.services.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0.loadbalancer.server.port=8000
+      - traefik.http.services.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0.loadbalancer.server.port=8000
+      - 'caddy_0.encode=zstd gzip'
+      - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8000}}'
+      - 'caddy_0.handle_path=/*'
+      - caddy_0.header=-Server
+      - 'caddy_0.try_files={path} /index.html /index.php'
+      - 'caddy_0=https://mem0api.jhostly.com'
+      - caddy_ingress_network=y5yyqqo45yfnx6kviqypa5dh
+    networks:
+      y5yyqqo45yfnx6kviqypa5dh: null
+    env_file:
+      - .env
+
+  postgres:
+    image: 'ankane/pgvector:v0.5.1'
+    restart: on-failure
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: mem0user
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_DB: mem0
+      COOLIFY_RESOURCE_UUID: y5yyqqo45yfnx6kviqypa5dh
+      COOLIFY_CONTAINER_NAME: postgres-y5yyqqo45yfnx6kviqypa5dh
+      SERVICE_NAME_MEM0: mem0
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_MEM0_DASHBOARD: mem0-dashboard
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - mem0
+        - '-U'
+        - mem0user
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - 'y5yyqqo45yfnx6kviqypa5dh_mem0-pgdata-v2:/var/lib/postgresql/data'
+    container_name: postgres-y5yyqqo45yfnx6kviqypa5dh
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.1.0
+      - coolify.serviceId=3
+      - coolify.type=service
+      - coolify.name=postgres-y5yyqqo45yfnx6kviqypa5dh
+      - coolify.resourceName=service-ej07ayd7karag0pdo1cqh77u
+      - coolify.projectName=mem0
+      - coolify.serviceName=postgres
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+      - coolify.service.subId=2
+      - coolify.service.subType=database
+      - coolify.service.subName=postgres
+    networks:
+      y5yyqqo45yfnx6kviqypa5dh: null
+    env_file:
+      - .env
+
+  mem0-dashboard:
+    image: 'mem0-dashboard:latest'
+    pull_policy: build
+    build:
+      context: 'https://github.com/jaketribe417/mem0-hermes-skill.git#main'
+      dockerfile: deploy/dashboard.Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: 'https://mem0api.jhostly.com'
+      API_INTERNAL_URL: 'http://mem0:8000'
+      NEXT_PUBLIC_INSTANCE_NAME: Mem0
+      COOLIFY_RESOURCE_UUID: y5yyqqo45yfnx6kviqypa5dh
+      COOLIFY_CONTAINER_NAME: mem0-dashboard-y5yyqqo45yfnx6kviqypa5dh
+      COOLIFY_FQDN: mem0.jhostly.com
+      COOLIFY_URL: 'https://mem0.jhostly.com'
+      SERVICE_NAME_MEM0: mem0
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_MEM0_DASHBOARD: mem0-dashboard
+    expose:
+      - '3000'
+    depends_on:
+      - mem0
+    restart: unless-stopped
+    container_name: mem0-dashboard-y5yyqqo45yfnx6kviqypa5dh
+    healthcheck:
+      test: ['CMD', 'curl', '-sf', 'http://localhost:3000/login']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.1.0
+      - coolify.serviceId=3
+      - coolify.type=service
+      - coolify.name=mem0-dashboard-y5yyqqo45yfnx6kviqypa5dh
+      - coolify.resourceName=service-ej07ayd7karag0pdo1cqh77u
+      - coolify.projectName=mem0
+      - coolify.serviceName=dashboard
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+      - coolify.service.subId=8
+      - coolify.service.subType=application
+      - coolify.service.subName=dashboard
+      - traefik.enable=true
+      - traefik.http.middlewares.gzip.compress=true
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.entryPoints=http
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.middlewares=redirect-to-https
+      - 'traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.rule=Host(`mem0.jhostly.com`) && PathPrefix(`/`)'
+      - traefik.http.routers.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.service=http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.entryPoints=https
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.middlewares=gzip
+      - 'traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.rule=Host(`mem0.jhostly.com`) && PathPrefix(`/`)'
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.service=https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.tls=true
+      - traefik.http.services.http-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.loadbalancer.server.port=3000
+      - traefik.http.services.https-0-y5yyqqo45yfnx6kviqypa5dh-mem0-dashboard.loadbalancer.server.port=3000
+      - 'caddy_0.encode=zstd gzip'
+      - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
+      - 'caddy_0.handle_path=/*'
+      - caddy_0.header=-Server
+      - 'caddy_0.try_files={path} /index.html /index.php'
+      - 'caddy_0=https://mem0.jhostly.com'
+      - caddy_ingress_network=y5yyqqo45yfnx6kviqypa5dh
+    networks:
+      y5yyqqo45yfnx6kviqypa5dh: null
+    env_file:
+      - .env
+
+volumes:
+  y5yyqqo45yfnx6kviqypa5dh_mem0-history:
+    name: y5yyqqo45yfnx6kviqypa5dh_mem0-history
+  y5yyqqo45yfnx6kviqypa5dh_mem0-pgdata-v2:
+    name: y5yyqqo45yfnx6kviqypa5dh_mem0-pgdata-v2
+
+networks:
+  y5yyqqo45yfnx6kviqypa5dh:
+    name: y5yyqqo45yfnx6kviqypa5dh
+    external: true
