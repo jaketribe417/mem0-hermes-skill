@@ -28,12 +28,7 @@ RUN chmod +x /app/mem0_apply_patches.py
 RUN python3 /app/mem0_apply_patches.py /usr/local/lib/python3.11/site-packages
 
 # Validate patches were applied
-RUN python3 -c "
-import mem0.memory.main as mm
-src = open(mm.__file__).read()
-assert '(1.0 - mem.score)' in src, 'SCORE PATCH FAILED'
-print('PATCH VALIDATED: score inversion active')
-"
+RUN python3 -c "import mem0.memory.main as mm; src = open(mm.__file__).read(); assert '(1.0 - mem.score)' in src, 'SCORE PATCH FAILED'; print('PATCH VALIDATED: score inversion active')"
 
 # Copy startup script
 COPY entrypoint.sh /entrypoint.sh
