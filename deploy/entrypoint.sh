@@ -23,4 +23,4 @@ alembic upgrade head
 
 # Verify build endpoint is accessible
 echo "Starting uvicorn on 0.0.0.0:8000..."
-exec uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers
+exec uvicorn mem0.server.main:app --host 0.0.0.0 --port 8000 --proxy-headers
