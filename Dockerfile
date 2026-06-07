@@ -13,6 +13,9 @@ RUN curl -sL "https://github.com/mem0ai/mem0/archive/${MEM0_COMMIT}.tar.gz" | ta
     && mv mem0-${MEM0_COMMIT}/server/* . \
     && rm -rf mem0-${MEM0_COMMIT}
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/entrypoint.sh"]
